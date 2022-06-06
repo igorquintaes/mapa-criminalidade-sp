@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+	<header>
+		<title>Mapa da Criminalidade no Estado de São Paulo</title>
+		<style>
+			#mapa {
+				height:calc(100vh - 500px);
+			}
+			#filtros {
+				height: 500px;
+				width: 100%;
+			}
+			html, body {
+				height: 100%;
+				margin: 0;
+				padding: 0;
+			}
+		</style>
+		<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-0evHe/X+R7YkIZDRvuzKMRqM+OrBnVFBL6DOitfPri4tjfHxaWutUpFmBp4vmVor" crossorigin="anonymous">
+
+	</header>
+	<body>
+		<div id="filtros">
+			<form>			  
+				<div class="input-group mb-3">
+					<span class="input-group-text">Data início</span>
+					<input id="dataInicio" type="date" class="form-control" placeholder="Data início" aria-label="Data início">
+					<span class="input-group-text">Data fim</span>
+					<input id="dataFim" type="date" class="form-control" placeholder="Data fim" aria-label="Data fim">
+				</div>
+				<div class="input-group mb-3">
+					<span class="input-group-text">Hora início</span>
+					<input id="horaInicio" type="time" class="form-control" placeholder="Hora início" aria-label="Hora início">
+					<span class="input-group-text">Hora fim</span>
+					<input id="horaFim" type="time" class="form-control" placeholder="Hora fim" aria-label="Hora fim">
+				</div>
+				<div class="input-group mb-3">
+					<span class="input-group-text">Período</span>
+					<select id="periodo" class="form-select" multiple size="6" aria-label="multiple select">
+						<option selected value="">Todos</option>
+						<option value="0">Manhã</option>
+						<option value="1">Tarde</option>
+						<option value="2">Noite</option>
+						<option value="3">Madrugada</option>
+						<option value="4">Incerto</option>
+					</select>
+				</div>
+				<div class="input-group mb-3">
+					<span class="input-group-text">Tipo de Ocorrência</span>
+					<select id="tipoOcorrencia" class="form-select" aria-label="multiple select">
+						<option selected value="">Todas</option>
+						<option value="0">Roubo de Celular</option>
+					</select>
+				</div>
+				<div class="input-group mb-3">
+					<span class="input-group-text">Cidade</span>
+					<select id="cidades" class="form-select" aria-label="multiple select">
+					</select>
+				</div>
+				<a href="#" id="filtrar" class="btn btn-primary" onclick="filtrar(); return false;">Filtrar</a>
+			</form>
+		</div>
+		<div id="mapa"></div>
+		<script>
+			var mapa, mapaDeCalor;
+			
+			async function inicializar() {
+				mapa = new google.maps.Map(document.getElementById('mapa'), {
+					zoom: 13,
+					center: {
+						lat: -23.544015800000004, 
+						lng: -46.64237950000001
+					},
+				});				
+				
+				const cidadePadrao = "S.PAULO";
+				var cidadesSelect = document.getElementById("cidades");
+				await obterCidades().then(async cidades => {
+					for (let i = 0; i < cidades.length; i++) {
+						cidadesSelect.add(new Option(cidades[i], cidades[i]));
+					}
+					cidadesSelect.value = cidadePadrao;
+					await obterOcorrencias(cidadePadrao).then(async ocorrencias => {	
+						var coordenadas = new google.maps.MVCArray();
+						for (let i = 0; i < ocorrencias.length; i++) {
+							coordenadas.push(new google.maps.LatLng(ocorrencias[i].latitude, ocorrencias[i].longitude));		
+						}
+						
+						mapaDeCalor = new google.maps.visualization.HeatmapLayer({
+							data: coordenadas,
+							map: mapa,
+							maxIntensity: 1
+						});
+					}).catch(error => {
+						console.log(error);
+					})
+				}).catch(error => {
+					console.log(error);
+				});
+			}
+			
+			async function obterOcorrencias(cidade, filtros = "") {			
+				var fetchResult = await fetch('https://localhost:7234/Ocorrencias?cidade=' + cidade + filtros);						
+				return await fetchResult.json();
+			}
+			
+			async function obterCidades() {
+				var fetchResult = await fetch('https://localhost:7234/Cidades');
+				return await fetchResult.json();
+			}
+			
+			async function filtrar(event) {
+				mapaDeCalor.data.clear();
+				var dataMinima = document.getElementById("dataInicio").value;
+				var dataMaxima = document.getElementById("dataFim").value;
+				var horaMinima = document.getElementById("horaInicio").value;
+				var horaMaxima = document.getElementById("horaFim").value;
+				var tipoOcorrencia = document.getElementById("tipoOcorrencia").value;
+				var cidade = document.getElementById("cidades").value;
+				
+				var periodosFiltro = "";
+				if (!document.getElementById("periodo").options[0].selected)
+				{
+					for (let i = 1; i < document.getElementById("periodo").options.length; i++) {
+						if (document.getElementById("periodo").options[i].selected) {
+							periodosFiltro += "&periodos=" + document.getElementById("periodo").options[i].value;
+						}
+					}
+				}
+				
+				var filtros = `\&dataMinima=${dataMinima}\&dataMaxima=${dataMaxima}\&horaMinima=${horaMinima}\&horaMaxima=${horaMaxima}\&tipoOcorrencia=${tipoOcorrencia}` + periodosFiltro;
+				
+				await obterOcorrencias(cidade, filtros).then(async ocorrencias => {	
+					for (let i = 0; i < ocorrencias.length; i++) {
+						mapaDeCalor.data.push(new google.maps.LatLng(ocorrencias[i].latitude, ocorrencias[i].longitude));		
+					}
+				}).catch(error => {
+					console.log(error);
+				})
+			}
+		</script>
+		<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAxMlnVYar3SaIwgBLR6erN3M2ocYraBUI&libraries=visualization&callback=inicializar">
+		</script>
+	</body>
+</html>
