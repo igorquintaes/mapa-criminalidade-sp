@@ -68,7 +68,6 @@ jobs:
           push: true
           tags: ghcr.io/${{ env.REPO }}:${{ github.sha }}
           file: ./DadosCriminalizacaoSP.API/Dockerfile
-          context: ./DadosCriminalizacaoSP.API/
 
   deploy:
     permissions:
